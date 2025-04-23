@@ -341,9 +341,7 @@ def main():
         def jax_callable(x):
             # strip out all RNG usage so no random_seed appears in the jaxpr
             return module.apply(params, x, method=method, rngs={})
-        # JIT‑compile to eliminate random_seed primitives
-        jax_fn = jax.jit(jax_callable)
-        save_onnx(jax_fn, [("B", input_shape)], onnx_filename)
+        save_onnx(jax_callable, [("B", input_shape)], onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
         return onnx_filename
     input_shape = obs_shape
