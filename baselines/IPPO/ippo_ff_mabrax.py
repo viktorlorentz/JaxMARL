@@ -24,60 +24,72 @@ from flax import nnx
 class EarlyTermination(Exception): 
     pass
 
-class ActorModule(nn.Module):
-    action_dim: int
-    activation: str = "tanh"
-    actor_arch: Sequence[int] = None
+class ActorModule(nnx.Module):
+    def __init__(self, action_dim, activation="tanh", actor_arch=None, *, rngs=nnx.Rngs(0)):
+        self.activation = activation
+        arch = actor_arch or [128, 64, 64]
+        self.linears = [
+            nnx.Linear(
+                in_features=None,
+                out_features=h,
+                rngs=rngs,
+                kernel_init=orthogonal(np.sqrt(2)),
+                bias_init=constant(0.0),
+            )
+            for h in arch
+        ]
+        self.mean_linear = nnx.Linear(
+            in_features=None,
+            out_features=action_dim,
+            rngs=rngs,
+            kernel_init=orthogonal(0.01),
+            bias_init=constant(0.0),
+        )
 
-    @nn.compact
     def __call__(self, x):
-        act_fn = nn.relu if self.activation == "relu" else nn.tanh
-        a = x
-        for h in self.actor_arch or [128, 64, 64]:
-            a = nnx.Linear(a.shape[-1], h,
-                           rngs=nnx.Rngs(0),
-                           kernel_init=orthogonal(np.sqrt(2)),
-                           bias_init=constant(0.0))(a)
-            a = act_fn(a)
-        actor_mean = nnx.Linear(a.shape[-1], self.action_dim,
-                                rngs=nnx.Rngs(0),
-                                kernel_init=orthogonal(0.01),
-                                bias_init=constant(0.0))(a)
-        return actor_mean
+        act_fn = nnx.relu if self.activation == "relu" else nnx.tanh
+        for lin in self.linears:
+            x = act_fn(lin(x))
+        return self.mean_linear(x)
 
-class CriticModule(nn.Module):
-    activation: str = "tanh"
-    critic_arch: Sequence[int] = None
+class CriticModule(nnx.Module):
+    def __init__(self, activation="tanh", critic_arch=None, *, rngs=nnx.Rngs(0)):
+        self.activation = activation
+        arch = critic_arch or [128, 128, 128, 128]
+        self.linears = [
+            nnx.Linear(
+                in_features=None,
+                out_features=h,
+                rngs=rngs,
+                kernel_init=orthogonal(np.sqrt(2)),
+                bias_init=constant(0.0),
+            )
+            for h in arch
+        ]
+        self.output_linear = nnx.Linear(
+            in_features=None,
+            out_features=1,
+            rngs=rngs,
+            kernel_init=orthogonal(1.0),
+            bias_init=constant(0.0),
+        )
 
-    @nn.compact
     def __call__(self, x):
-        act_fn = nn.relu if self.activation == "relu" else nn.tanh
-        c = x
-        for h in self.critic_arch or [128, 128, 128, 128]:
-            c = nnx.Linear(c.shape[-1], h,
-                           rngs=nnx.Rngs(0),
-                           kernel_init=orthogonal(np.sqrt(2)),
-                           bias_init=constant(0.0))(c)
-            c = act_fn(c)
-        c = nnx.Linear(c.shape[-1], 1,
-                       rngs=nnx.Rngs(0),
-                       kernel_init=orthogonal(1.0),
-                       bias_init=constant(0.0))(c)
+        act_fn = nnx.relu if self.activation == "relu" else nnx.tanh
+        for lin in self.linears:
+            x = act_fn(lin(x))
+        c = self.output_linear(x)
         return jnp.squeeze(c, axis=-1)
 
-class ActorCritic(nn.Module):
-    action_dim: int
-    activation: str = "tanh"
-    actor_arch: Sequence[int] = None
-    critic_arch: Sequence[int] = None
-
-    def setup(self):
-        self.actor_module = ActorModule(action_dim=self.action_dim,
-                                        activation=self.activation,
-                                        actor_arch=self.actor_arch)
-        self.critic_module = CriticModule(activation=self.activation,
-                                          critic_arch=self.critic_arch)
-        self.log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
+class ActorCritic(nnx.Module):
+    def __init__(self, action_dim, activation="tanh", actor_arch=None, critic_arch=None, *, rngs=nnx.Rngs(0)):
+        self.actor_module = ActorModule(
+            action_dim, activation=activation, actor_arch=actor_arch, rngs=rngs
+        )
+        self.critic_module = CriticModule(
+            activation=activation, critic_arch=critic_arch, rngs=rngs
+        )
+        self.log_std = self.param("log_std", nn.initializers.zeros, (action_dim,))
 
     def __call__(self, x):
         actor_mean = self.actor_module(x)
@@ -86,11 +98,9 @@ class ActorCritic(nn.Module):
         return pi, critic
 
     def actor_forward(self, x):
-        # Returns actor output only
         return self.actor_module(x)
 
     def critic_forward(self, x):
-        # Returns critic value only
         return self.critic_module(x)
 
 class Transition(NamedTuple):
@@ -104,7 +114,6 @@ class Transition(NamedTuple):
 
 def batchify(x: dict, agent_list, num_actors):
     max_dim = max([x[a].shape[-1] for a in agent_list])
-    #print('max_dim', max_dim)
     def pad(z):
         return jnp.concatenate([z, jnp.zeros(z.shape[:-1] + (max_dim - z.shape[-1],))], -1)
 
@@ -138,7 +147,7 @@ def make_train(config, rng_init):
         actor_arch=config.get("ACTOR_ARCH", [128, 64, 64]),
         critic_arch=config.get("CRITIC_ARCH", [128, 128, 128])
     )
-    print('Network initialized with architectures:', network.actor_arch, network.critic_arch)
+    print('Network initialized with architectures:', network.actor_module.linears, network.critic_module.linears)
 
     max_dim = jnp.argmax(jnp.array([env.observation_space(a).shape[-1] for a in env.agents]))
     init_x = jnp.zeros(env.observation_space(env.agents[max_dim]).shape)
