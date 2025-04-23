@@ -345,7 +345,6 @@ def main():
         onnx_model = to_onnx(
             jax_callable,
             [(obs_shape,)],
-            input_params=params,
         )
         onnx.save_model(onnx_model, onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
