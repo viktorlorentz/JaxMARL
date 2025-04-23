@@ -339,7 +339,8 @@ def main():
     
     def export_to_onnx(module, params, input_shape, onnx_filename, method=None):
         def jax_callable(x):
-            return module.apply(params, x, method=method)
+            # strip out all RNG usage so no random_seed appears in the jaxpr
+            return module.apply(params, x, method=method, rngs={})
         save_onnx(jax_callable, [("B", input_shape)], onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
         return onnx_filename
