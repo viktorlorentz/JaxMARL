@@ -347,7 +347,7 @@ def main():
         )
         # Save the model
         onnx.save_model(onnx_model, onnx_filename)
-        print(f"Exported ONNX model: {onnx_filename} (in: {input_name}, out: {output_name})")
+        print(f"Exported ONNX model: {onnx_filename}")
         return onnx_filename
 
     # Use the full parameter tree from train_state
