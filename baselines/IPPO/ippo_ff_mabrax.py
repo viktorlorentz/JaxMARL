@@ -108,7 +108,8 @@ class ActorCritic(nnx.Module):
         self.critic_module = CriticModule(
             input_dim, activation, critic_arch, rngs=rngs
         )
-        self.log_std = self.param("log_std", nn.initializers.zeros, (action_dim,))
+        # learnable log_std parameter
+        self.log_std = nnx.Param(jnp.zeros((action_dim,)))
 
     def __call__(self, x):
         actor_mean = self.actor_module(x)
