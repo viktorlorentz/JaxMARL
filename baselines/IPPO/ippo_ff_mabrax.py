@@ -94,6 +94,10 @@ class CriticModule(nnx.Module):
         return jnp.squeeze(self.output_linear(x), -1)
 
 class ActorCritic(nnx.Module):
+    def __contains__(self, key):
+        # prevent TrainState.create from treating this Module as a mapping
+        return False
+
     def __init__(self,
                  input_dim: int,
                  action_dim: int,
