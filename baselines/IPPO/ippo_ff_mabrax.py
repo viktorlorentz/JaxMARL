@@ -186,7 +186,7 @@ def make_train(config, rng_init):
     apply_fn = lambda _, x: network(x)
     train_state = TrainState.create(
         apply_fn=apply_fn,
-        params=None,
+        params=network,
         tx=tx,
     )
 

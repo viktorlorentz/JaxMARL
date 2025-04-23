@@ -294,19 +294,13 @@ def main():
     # Initialize the ActorCritic network with proper dimensions (use first agent's spaces)
     obs_shape = env.observation_spaces[env.agents[0]].shape[0]
     act_dim = env.action_spaces[env.agents[0]].shape[0]
-    # Initialize ActorCritic with architectures from config
-    network = ActorCritic(
-        input_dim=obs_shape,
-        action_dim=act_dim,
-        activation=config["ACTIVATION"],
-        actor_arch=config.get("ACTOR_ARCH", [128, 64, 64]),
-        critic_arch=config.get("CRITIC_ARCH", [128, 128, 128])
-    )
+    # load the trained nnx.Module (with updated params)
+    network = train_state.params
     
     # Define a policy function to map observations to actions using the trained parameters
     def policy_fn(params, obs, key):
         batched_obs = batchify(obs, env.agents, env.num_agents)
-        actor_mean = network.apply(params, batched_obs, method=ActorCritic.actor_forward)
+        actor_mean = params.actor_forward(batched_obs)
         unbatched = unbatchify(actor_mean, env.agents, 1, env.num_agents)
         unbatched = {a: jp.squeeze(val, axis=0) for a, val in unbatched.items()}
         return unbatched
@@ -340,8 +334,8 @@ def main():
     
     def export_to_onnx(module, params, input_shape, onnx_filename, method=None):
         def jax_callable(x):
-            # strip out all RNG usage so no random_seed appears in the jaxpr
-            return module.apply(params, x, method=method, rngs={})
+            # invoke the nnx forward via the unbound method (actor_forward / critic_forward)
+            return method(params, x)
         save_onnx(jax_callable, [("B", input_shape)], onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
         return onnx_filename
