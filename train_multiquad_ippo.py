@@ -340,7 +340,7 @@ def main():
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
         def jax_callable(x):
-            return module.apply({'params': params}, x, method=method)
+            return module.apply(params, x, method=method)
 
         onnx_model = to_onnx(
             jax_callable,
