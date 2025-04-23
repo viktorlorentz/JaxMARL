@@ -58,6 +58,9 @@ class ActorCritic(nn.Module):
     actor_arch: Sequence[int] = None
     critic_arch: Sequence[int] = None
 
+   
+    __static_field_names__ = ("action_dim", "activation", "actor_arch", "critic_arch")
+
     def setup(self):
         self.actor_module = ActorModule(action_dim=self.action_dim,
                                         activation=self.activation,
