@@ -173,7 +173,7 @@ def make_train(config, rng_init):
 
     max_dim = jnp.argmax(jnp.array([env.observation_space(a).shape[-1] for a in env.agents]))
     init_x = jnp.zeros(env.observation_space(env.agents[max_dim]).shape)
-    network_params = network.init(rng_init, init_x)
+
     if config["ANNEAL_LR"]:
         tx = optax.chain(
             optax.clip_by_global_norm(config["MAX_GRAD_NORM"]),
@@ -182,9 +182,11 @@ def make_train(config, rng_init):
     else:
         tx = optax.chain(optax.clip_by_global_norm(config["MAX_GRAD_NORM"]), optax.adam(config["LR"], eps=1e-5))
 
+    # wrap the module call into apply_fn that ignores params
+    apply_fn = lambda _, x: network(x)
     train_state = TrainState.create(
-        apply_fn=network.apply,
-        params=network_params,
+        apply_fn=apply_fn,
+        params=None,
         tx=tx,
     )
 
@@ -206,7 +208,7 @@ def make_train(config, rng_init):
                 # SELECT ACTION
                 rng, _rng = jax.random.split(rng)
                 
-                pi, value = network.apply(train_state.params, obs_batch)
+                pi, value = network(obs_batch)
                 action = pi.sample(seed=_rng)
                 log_prob = pi.log_prob(action)
                 env_act = unbatchify(action, env.agents, config["NUM_ENVS"], env.num_agents)
@@ -238,7 +240,7 @@ def make_train(config, rng_init):
             # CALCULATE ADVANTAGE
             train_state, env_state, last_obs, update_count, rng = runner_state
             last_obs_batch = batchify(last_obs, env.agents, config["NUM_ACTORS"])
-            _, last_val = network.apply(train_state.params, last_obs_batch)
+            _, last_val = network(last_obs_batch)
 
             def _calculate_gae(traj_batch, last_val):
                 def _get_advantages(gae_and_next_value, transition):
@@ -273,7 +275,7 @@ def make_train(config, rng_init):
 
                     def _loss_fn(params, traj_batch, gae, targets):
                         # RERUN NETWORK
-                        pi, value = network.apply(params, traj_batch.obs)
+                        pi, value = network(traj_batch.obs)
                         log_prob = pi.log_prob(traj_batch.action)
 
                         # CALCULATE VALUE LOSS
