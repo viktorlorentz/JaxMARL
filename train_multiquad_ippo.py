@@ -338,8 +338,7 @@ def main():
     # Call the separated video rendering function
     render_video(rollout, env)
     
-    def export_to_onnx(module, params, obs_shape, onnx_filename, method=None,
-                       input_name="input", output_name="output"):
+    def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
         def jax_callable(x):
             return module.apply(params, x, method=method)
         onnx_model = to_onnx(
