@@ -359,18 +359,14 @@ def main():
         params=full_params,
         obs_shape=obs_shape,
         onnx_filename="actor_policy.onnx",
-        method=ActorCritic.actor_forward,
-        input_name="obs",
-        output_name="action_mean",
+        method=ActorCritic.actor_forward
     )
     critic_onnx = export_to_onnx(
         module=network,
         params=full_params,
         obs_shape=obs_shape,
         onnx_filename="critic_value.onnx",
-        method=ActorCritic.critic_forward,
-        input_name="obs",
-        output_name="value",
+        method=ActorCritic.critic_forward
     )
     
     # Log the ONNX models as wandb artifacts.
