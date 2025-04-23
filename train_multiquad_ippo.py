@@ -339,8 +339,10 @@ def main():
     render_video(rollout, env)
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
+        # disable log_std during export
+        export_module = module.replace(exporting=True)
         def jax_callable(x):
-            return module.apply(params, x, method=method)
+            return export_module.apply(params, x, method=method)
 
         onnx_model = to_onnx(
             jax_callable,

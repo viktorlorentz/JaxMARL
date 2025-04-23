@@ -57,9 +57,9 @@ class ActorCritic(nn.Module):
     activation: str = "tanh"
     actor_arch: Sequence[int] = None
     critic_arch: Sequence[int] = None
+    exporting: bool = False
 
-   
-    __static_field_names__ = ("action_dim", "activation", "actor_arch", "critic_arch")
+    __static_field_names__ = ("action_dim", "activation", "actor_arch", "critic_arch", "exporting")
 
     def setup(self):
         self.actor_module = ActorModule(action_dim=self.action_dim,
@@ -68,7 +68,8 @@ class ActorCritic(nn.Module):
         self.critic_module = CriticModule(activation=self.activation,
                                           critic_arch=self.critic_arch)
      
-        self.log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
+        if not self.exporting:
+            self.log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
 
     def __call__(self, x):
         actor_mean = self.actor_module(x)
