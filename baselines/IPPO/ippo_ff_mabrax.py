@@ -25,21 +25,28 @@ class EarlyTermination(Exception):
     pass
 
 class ActorModule(nnx.Module):
-    def __init__(self, action_dim, activation="tanh", actor_arch=None, *, rngs=nnx.Rngs(0)):
+    def __init__(self,
+                 input_dim: int,
+                 action_dim: int,
+                 activation: str = "tanh",
+                 actor_arch: Sequence[int] = None,
+                 *,
+                 rngs=nnx.Rngs(0)):
         self.activation = activation
         arch = actor_arch or [128, 64, 64]
+        dims = [input_dim] + arch
         self.linears = [
             nnx.Linear(
-                in_features=None,
-                out_features=h,
+                in_features=d0,
+                out_features=d1,
                 rngs=rngs,
                 kernel_init=orthogonal(np.sqrt(2)),
                 bias_init=constant(0.0),
             )
-            for h in arch
+            for d0, d1 in zip(dims, dims[1:])
         ]
         self.mean_linear = nnx.Linear(
-            in_features=None,
+            in_features=dims[-1],
             out_features=action_dim,
             rngs=rngs,
             kernel_init=orthogonal(0.01),
@@ -53,21 +60,27 @@ class ActorModule(nnx.Module):
         return self.mean_linear(x)
 
 class CriticModule(nnx.Module):
-    def __init__(self, activation="tanh", critic_arch=None, *, rngs=nnx.Rngs(0)):
+    def __init__(self,
+                 input_dim: int,
+                 activation: str = "tanh",
+                 critic_arch: Sequence[int] = None,
+                 *,
+                 rngs=nnx.Rngs(0)):
         self.activation = activation
         arch = critic_arch or [128, 128, 128, 128]
+        dims = [input_dim] + arch
         self.linears = [
             nnx.Linear(
-                in_features=None,
-                out_features=h,
+                in_features=d0,
+                out_features=d1,
                 rngs=rngs,
                 kernel_init=orthogonal(np.sqrt(2)),
                 bias_init=constant(0.0),
             )
-            for h in arch
+            for d0, d1 in zip(dims, dims[1:])
         ]
         self.output_linear = nnx.Linear(
-            in_features=None,
+            in_features=dims[-1],
             out_features=1,
             rngs=rngs,
             kernel_init=orthogonal(1.0),
@@ -78,16 +91,22 @@ class CriticModule(nnx.Module):
         act_fn = nnx.relu if self.activation == "relu" else nnx.tanh
         for lin in self.linears:
             x = act_fn(lin(x))
-        c = self.output_linear(x)
-        return jnp.squeeze(c, axis=-1)
+        return jnp.squeeze(self.output_linear(x), -1)
 
 class ActorCritic(nnx.Module):
-    def __init__(self, action_dim, activation="tanh", actor_arch=None, critic_arch=None, *, rngs=nnx.Rngs(0)):
+    def __init__(self,
+                 input_dim: int,
+                 action_dim: int,
+                 activation: str = "tanh",
+                 actor_arch: Sequence[int] = None,
+                 critic_arch: Sequence[int] = None,
+                 *,
+                 rngs=nnx.Rngs(0)):
         self.actor_module = ActorModule(
-            action_dim, activation=activation, actor_arch=actor_arch, rngs=rngs
+            input_dim, action_dim, activation, actor_arch, rngs=rngs
         )
         self.critic_module = CriticModule(
-            activation=activation, critic_arch=critic_arch, rngs=rngs
+            input_dim, activation, critic_arch, rngs=rngs
         )
         self.log_std = self.param("log_std", nn.initializers.zeros, (action_dim,))
 
@@ -141,7 +160,9 @@ def make_train(config, rng_init):
         return config["LR"] * frac
 
     # INIT NETWORK 
+    obs_dim = env.observation_space(env.agents[0]).shape[-1]
     network = ActorCritic(
+        input_dim=obs_dim,
         action_dim=env.action_space(env.agents[0]).shape[0],
         activation=config["ACTIVATION"],
         actor_arch=config.get("ACTOR_ARCH", [128, 64, 64]),

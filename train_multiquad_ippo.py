@@ -296,6 +296,7 @@ def main():
     act_dim = env.action_spaces[env.agents[0]].shape[0]
     # Initialize ActorCritic with architectures from config
     network = ActorCritic(
+        input_dim=obs_shape,
         action_dim=act_dim,
         activation=config["ACTIVATION"],
         actor_arch=config.get("ACTOR_ARCH", [128, 64, 64]),
