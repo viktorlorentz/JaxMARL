@@ -67,9 +67,8 @@ class ActorCritic(nn.Module):
                                         actor_arch=self.actor_arch)
         self.critic_module = CriticModule(activation=self.activation,
                                           critic_arch=self.critic_arch)
-        # ensure shape is a static Python int tuple
-        dim = int(self.action_dim)
-        self.log_std = self.param('log_std', nn.initializers.zeros, (dim,))
+     
+        self.log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
 
     def __call__(self, x):
         actor_mean = self.actor_module(x)

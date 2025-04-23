@@ -343,7 +343,7 @@ def main():
             return module.apply(params, x, method=method)
         onnx_model = to_onnx(
             jax_callable,
-            [("B", obs_shape)]
+            [(obs_shape,)]
         )
         # Save the model
         onnx.save_model(onnx_model, onnx_filename)
