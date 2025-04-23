@@ -337,12 +337,22 @@ def main():
     # Call the separated video rendering function
     render_video(rollout, env)
     
-    def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
+    def export_to_onnx(module, params, obs_shape, onnx_filename, method=None,
+                       input_name="input", output_name="output"):
         def jax_callable(x):
             return module.apply(params, x, method=method)
-        # Use a hardcoded batch size = 1 for export
-        save_onnx(jax_callable, [("B", obs_shape)], onnx_filename)
-        print(f"Exported ONNX model: {onnx_filename}")
+        # export with dynamic batch axis, named I/O, and opset 13
+        save_onnx(
+            jax_callable,
+            [(input_name, ("batch",) + (obs_shape,))],
+            onnx_filename,
+            input_names=[input_name],
+            output_names=[output_name],
+            dynamic_axes={input_name: {0: "batch"}, output_name: {0: "batch"}},
+            opset_version=13,
+            include_intermediate_shapes=True,
+        )
+        print(f"Exported ONNX model: {onnx_filename} (in: {input_name}, out: {output_name})")
         return onnx_filename
 
     # Use the full parameter tree from train_state
@@ -354,20 +364,28 @@ def main():
         params=full_params,
         obs_shape=obs_shape,
         onnx_filename="actor_policy.onnx",
-        method=ActorCritic.actor_forward
+        method=ActorCritic.actor_forward,
+        input_name="obs",
+        output_name="action_mean",
     )
     critic_onnx = export_to_onnx(
         module=network,
         params=full_params,
         obs_shape=obs_shape,
         onnx_filename="critic_value.onnx",
-        method=ActorCritic.critic_forward
+        method=ActorCritic.critic_forward,
+        input_name="obs",
+        output_name="value",
     )
     
     # Log the ONNX models as wandb artifacts.
-    actor_artifact = wandb.Artifact("actor_policy", type="model")
+    actor_artifact = wandb.Artifact(
+        "actor_policy", type="model", metadata={"model_type": "actor"}
+    )
     actor_artifact.add_file(actor_onnx)
-    critic_artifact = wandb.Artifact("critic_value", type="model")
+    critic_artifact = wandb.Artifact(
+        "critic_value", type="model", metadata={"model_type": "critic"}
+    )
     critic_artifact.add_file(critic_onnx)
     wandb.log_artifact(actor_artifact)
     wandb.log_artifact(critic_artifact)
