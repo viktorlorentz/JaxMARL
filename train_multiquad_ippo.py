@@ -339,14 +339,14 @@ def main():
     render_video(rollout, env)
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
-        def jax_callable(x, **params):
-            return module.apply(params, x, method=method)
+        def jax_callable(x):
+            return module.apply({'params': params}, x, method=method)
+
         onnx_model = to_onnx(
             jax_callable,
             [(obs_shape,)],
             input_params=params,
         )
-        # Save the model
         onnx.save_model(onnx_model, onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
         return onnx_filename
