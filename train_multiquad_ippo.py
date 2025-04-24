@@ -339,8 +339,15 @@ def main():
     render_video(rollout, env)
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
-        # disable log_std during export
-        export_module = module.replace(exporting=True)
+        from baselines.IPPO.ippo_ff_mabrax import ActorCritic
+        export_module = ActorCritic(
+            action_dim=module.action_dim,
+            activation=module.activation,
+            actor_arch=module.actor_arch,
+            critic_arch=module.critic_arch,
+            exporting=True,
+        )
+
         def jax_callable(x):
             return export_module.apply(params, x, method=method)
 
