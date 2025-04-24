@@ -340,19 +340,20 @@ def main():
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
         # choose submodule and slice out its params
+        inner = params["params"]
         if method is ActorCritic.actor_forward:
             submod = ActorModule(
                 action_dim=module.action_dim,
                 activation=module.activation,
                 actor_arch=module.actor_arch,
             )
-            var_dict = {"params": params["actor_module"]}
+            var_dict = {"params": inner["actor_module"]}
         else:
             submod = CriticModule(
                 activation=module.activation,
                 critic_arch=module.critic_arch,
             )
-            var_dict = {"params": params["critic_module"]}
+            var_dict = {"params": inner["critic_module"]}
 
         def jax_callable(x):
             return submod.apply(var_dict, x)
