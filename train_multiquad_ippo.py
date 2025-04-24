@@ -339,7 +339,6 @@ def main():
     render_video(rollout, env)
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
-        # choose submodule and slice out its params
         inner = params["params"]
         if method is ActorCritic.actor_forward:
             submod = ActorModule(
@@ -361,6 +360,7 @@ def main():
         onnx_model = to_onnx(
             jax_callable,
             [(obs_shape,)],
+            input_params=var_dict,
         )
         onnx.save_model(onnx_model, onnx_filename)
         print(f"Exported ONNX model: {onnx_filename}")
