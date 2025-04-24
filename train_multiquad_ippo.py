@@ -29,7 +29,7 @@ import jaxmarl
 import time
 import wandb
 # Import training utilities and network definitions from ippo_ff_mabrax.py
-from baselines.IPPO.ippo_ff_mabrax import make_train, ActorCritic, batchify, unbatchify
+from baselines.IPPO.ippo_ff_mabrax import make_train, ActorCritic, batchify, unbatchify, ActorModule, CriticModule
 
 from jax2onnx import to_onnx
 import onnx
@@ -339,17 +339,23 @@ def main():
     render_video(rollout, env)
     
     def export_to_onnx(module, params, obs_shape, onnx_filename, method=None):
-        from baselines.IPPO.ippo_ff_mabrax import ActorCritic
-        export_module = ActorCritic(
-            action_dim=module.action_dim,
-            activation=module.activation,
-            actor_arch=module.actor_arch,
-            critic_arch=module.critic_arch,
-            exporting=True,
-        )
+        # choose submodule and slice out its params
+        if method is ActorCritic.actor_forward:
+            submod = ActorModule(
+                action_dim=module.action_dim,
+                activation=module.activation,
+                actor_arch=module.actor_arch,
+            )
+            var_dict = {"params": params["actor_module"]}
+        else:
+            submod = CriticModule(
+                activation=module.activation,
+                critic_arch=module.critic_arch,
+            )
+            var_dict = {"params": params["critic_module"]}
 
         def jax_callable(x):
-            return export_module.apply(params, x, method=method)
+            return submod.apply(var_dict, x)
 
         onnx_model = to_onnx(
             jax_callable,
