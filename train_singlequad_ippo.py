@@ -136,7 +136,7 @@ def main():
             "tau_down":0.05,    #
             "sim_steps_per_action" : 1,
             "disturbance_chance": 1/(500*5),  # one every  5 seconds    
-            "history_length": 5, 
+            "history_length": 3, 
         },
         # "TOTAL_TIMESTEPS": 5_000_000_000,
         # "NUM_ENVS": 16384,
@@ -157,8 +157,8 @@ def main():
         "GAMMA": 0.99,
         "GAE_LAMBDA": 0.95,
         "SEED": 0,
-        "ACTOR_ARCH": [64, 64, 64],
-        "CRITIC_ARCH": [64, 64, 64],
+        "ACTOR_ARCH": [64, 64],
+        "CRITIC_ARCH": [64, 64],
         "DISABLE_JIT": False,
         "PROJECT": "single_quad_rl",
         "NAME": f"quad_{int(time.time())}",
