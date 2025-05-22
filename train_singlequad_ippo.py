@@ -136,7 +136,7 @@ def main():
             "tau_down":0.05,    #
             "sim_steps_per_action" : 1,
             "disturbance_chance": 1/(500*5),  # one every  5 seconds    
-            "history_length": 5, 
+            "history_length": 10, 
         },
         # "TOTAL_TIMESTEPS": 5_000_000_000,
         # "NUM_ENVS": 16384,
