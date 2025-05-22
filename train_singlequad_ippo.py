@@ -109,7 +109,7 @@ def main():
     default_reward_coeffs = {
         "distance_reward_coef": 1.0,
         "z_distance_reward_coef": 0.0,
-        "velocity_reward_coef": 1.0,
+        "velocity_reward_coef": 10.0,
         "safe_distance_coef": 0.0,
         "up_reward_coef": 10.0,
         "linvel_reward_coef": 0.0,
@@ -154,7 +154,7 @@ def main():
         "CLIP_EPS": 0.2,
         "VF_COEF": 0.5,
         "ENT_COEF": 0.01,
-        "GAMMA": 0.999,
+        "GAMMA": 0.995,
         "GAE_LAMBDA": 0.95,
         "SEED": 0,
         "ACTOR_ARCH": [64, 64],
