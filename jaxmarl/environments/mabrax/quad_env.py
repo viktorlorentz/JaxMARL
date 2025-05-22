@@ -640,7 +640,7 @@ class QuadEnv(PipelineEnv):
         # jp.ones(3) * 0.1,   # quad linear velocity
         jp.ones(3) * 0.2,   # quad angular velocity
         jp.ones(3) * 0.5,   # quad linear acceleration
-        jp.ones(self.sys.nu) * 0.01,  # action history
+        jp.ones(self.sys.nu) * 0.0,  # action history
     ])
 
     if self.obs_noise != 0.0:
