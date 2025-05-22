@@ -109,7 +109,7 @@ def main():
     default_reward_coeffs = {
         "distance_reward_coef": 1.0,
         "z_distance_reward_coef": 0.0,
-        "velocity_reward_coef": 1.0,
+        "velocity_reward_coef": 10.0,
         "safe_distance_coef": 0.0,
         "up_reward_coef": 1.0,
         "linvel_reward_coef": 0.0,
@@ -119,7 +119,7 @@ def main():
         "collision_penalty_coef": -10.0,
         "out_of_bounds_penalty_coef": -10.0,
         "smooth_action_coef": -20.0,
-        "action_energy_coef": -0.2,
+        "action_energy_coef": 0.01,
         "yaw_reward_coef": 0.0,
     }
     # Build configuration for IPPO training on multiquad_2x4
