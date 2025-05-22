@@ -119,7 +119,7 @@ def main():
         "collision_penalty_coef": -10.0,
         "out_of_bounds_penalty_coef": -10.0,
         "smooth_action_coef": -20.0,
-        "action_energy_coef": -0.5,
+        "action_energy_coef": -0.2,
         "yaw_reward_coef": 0.0,
     }
     # Build configuration for IPPO training on multiquad_2x4
@@ -142,7 +142,7 @@ def main():
         # "NUM_ENVS": 16384,
         # "NUM_STEPS": 128,
         # "NUM_MINIBATCHES": 512,
-        "TOTAL_TIMESTEPS": 1_000_000_000,
+        "TOTAL_TIMESTEPS": 4_000_000_000,
         "NUM_ENVS": 4096, # 16384,
         "NUM_STEPS": 128,
         "NUM_MINIBATCHES": 128, #512,
