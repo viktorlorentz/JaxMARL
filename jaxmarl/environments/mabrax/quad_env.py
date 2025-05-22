@@ -735,7 +735,7 @@ class QuadEnv(PipelineEnv):
     # target_reward *= jp.exp(-1.4 * jp.abs(dis))
 
 
-    smooth_action_penalty = jp.sum(jp.abs(action - last_action))
+    smooth_action_penalty = jp.mean(jp.abs(action - last_action))
     smooth_action_penalty /= self.time_per_action * 1000  # normlize for frequency
 
     action_energy_penalty = jp.mean((0.5 * (action + 1))**2)
@@ -786,6 +786,18 @@ class QuadEnv(PipelineEnv):
     # Combine all rewards and penalties.
    
     reward = tracking_reward + stability_reward + safety_reward
+
+    if self.debug:
+      jax.debug.print("reward: {reward}", reward=reward)
+      jax.debug.print("distance_reward: {distance_reward}", distance_reward=distance_reward)
+      jax.debug.print("z_distance_reward: {z_distance_reward}", z_distance_reward=z_distance_reward)
+      jax.debug.print("collision_penalty: {collision_penalty}", collision_penalty=collision_penalty)
+      jax.debug.print("out_of_bounds_penalty: {out_of_bounds_penalty}", out_of_bounds_penalty=out_of_bounds_penalty)
+      jax.debug.print("up_reward: {up_reward}", up_reward=up_reward)
+      jax.debug.print("ang_vel_reward: {ang_vel_reward}", ang_vel_reward=ang_vel_reward)
+      jax.debug.print("linvel_quad_reward: {linvel_quad_reward}", linvel_quad_reward=linvel_quad_reward)
+      jax.debug.print("smooth_action_penalty: {smooth_action_penalty}", smooth_action_penalty=smooth_action_penalty)
+      jax.debug.print("action_energy_penalty: {action_energy_penalty}", action_energy_penalty=action_energy_penalty)
     
   
 
