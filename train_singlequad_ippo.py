@@ -127,7 +127,7 @@ def main():
         "ENV_NAME": "quad_1x4",
         "ENV_KWARGS": {
             "reward_coeffs": default_reward_coeffs,
-            "obs_noise": 0.3,
+            "obs_noise": 1.0,
             "act_noise": 0.1,
             "max_thrust_range": 0.3,
             "episode_length": 8192,
@@ -136,7 +136,7 @@ def main():
             "tau_down":0.05,    #
             "sim_steps_per_action" : 1,
             "disturbance_chance": 1/(500*5),  # one every  5 seconds    
-            "action_history_length": 1, #actually 0 in mapping
+            "history_length": 5, 
         },
         # "TOTAL_TIMESTEPS": 5_000_000_000,
         # "NUM_ENVS": 16384,

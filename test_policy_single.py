@@ -34,8 +34,7 @@ config = {
         "policy_freq": 500,
         "tau_up": 0.15/4,   # 60ms   
         "tau_down": 0.15/4,    # 5ms
-        "disturbance_chance": 0.004, 
-        "action_history_length": 1,        
+        "disturbance_chance": 0.004,        
     },
 }
 env = jaxmarl.make(config["ENV_NAME"], **config["ENV_KWARGS"])

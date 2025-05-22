@@ -55,7 +55,7 @@ class QuadEnv(PipelineEnv):
       disturbance_chance: float = 0.0,      # chance per step to apply wrench
       disturbance_force: float = 0.0,       # linear‐force scale
       disturbance_torque: float = 0.0,      # angular‐torque scale
-      action_history_length: int = 1, # number of past actions in the observation
+      history_length: int = 5,   # number of past observations to stack
       **kwargs,
   ):
     print("Initializing QuadEnv")
@@ -84,7 +84,7 @@ class QuadEnv(PipelineEnv):
     self.disturbance_chance = disturbance_chance
     self.disturbance_force = disturbance_force
     self.disturbance_torque = disturbance_torque
-    self.action_history_length = action_history_length
+    self.history_length = history_length
    
     if reward_coeffs is None:
       reward_coeffs = {
@@ -138,9 +138,12 @@ class QuadEnv(PipelineEnv):
     # self.payload_qpos_start = sys.mj_model.jnt_qposadr[self.payload_joint_id]
     self.q1_qpos_start = sys.mj_model.jnt_qposadr[self.q1_joint_id]
 
-    # Override OBS_SIZE to account for history
-    base_dim = 3 + 9 + 3 + 3 + 3
-    self.OBS_SIZE = base_dim + self.sys.nu * self.action_history_length
+
+    self.BASE_OBS_SIZE = 3 + 3 + 3 + 4        
+    self.OBS_SIZE = self.BASE_OBS_SIZE * self.history_length
+
+    print("Observation size:", self.BASE_OBS_SIZE)
+    print("Stacked observation size and history length:", self.OBS_SIZE, self.history_length)
 
     print("IDs:")
     # print("Payload body ID:", self.payload_body_id)
@@ -320,17 +323,21 @@ class QuadEnv(PipelineEnv):
     # last_action = jax.random.normal(rng1, shape=last_action.shape) * 0.4
     # last_action = jp.clip(last_action, -1.0, 1.0)
 
-    # Build initial history = [last_action,...] repeated
-    last_action_history = jp.concatenate([last_action] * self.action_history_length)
 
-    rng, noise_key = jax.random.split(rng)       # new: split for observation noise
+    rng, noise_key = jax.random.split(rng)       
+    
     obs = self._get_obs(
       pipeline_state,
-      last_action_history,
+      last_action,
       self.target_position,
-      noise_key,
-      prev_linvel=jp.zeros(3)
+      noise_key
     )
+
+    # initialize observation history [H x N_obs]
+    obs_history = jp.stack([obs] * self.history_length)
+    # build stacked observation
+    stacked_obs = self.get_stacked_obs(obs_history)
+
     reward = jp.array(0.0)
     done = jp.array(0.0)
 
@@ -345,14 +352,13 @@ class QuadEnv(PipelineEnv):
       'time': pipeline_state.time,
       'reward': reward,
       'max_thrusts': max_thrusts,
-      'last_action_history': last_action_history,
+      'obs_history': obs_history,
       'last_thrust': init_thrust,
       'tau_up': tau_up,
       'tau_down': tau_down,
       'noise_key': noise_key,              
-      'prev_linvel': jp.zeros(3),
     }
-    return State(pipeline_state, obs, reward, done, metrics)
+    return State(pipeline_state, stacked_obs, reward, done, metrics)
 
   def motor_model(self, action_normalized, max_thrust, act_noise, noise_key, tau_up=None, tau_down=None, last_thrust=None):
     """Motor model for thrust calculation."""
@@ -392,20 +398,14 @@ class QuadEnv(PipelineEnv):
     Returns:
         The next state.
     """
-    # Extract previous action history from the metrics.
-    prev_hist = state.metrics['last_action_history']
+    # Extract previous observation history from the metrics.
+    prev_hist = state.metrics['obs_history']
     
     if self.debug:
       jax.debug.print("prev_hist: {prev_hist}", prev_hist=prev_hist)
       jax.debug.print("action: {action}", action=action)
 
     clipped_action = jp.clip(action, -1.0, 1.0)
-
-    # Retrieve history and append new action
-    new_hist = jp.concatenate([
-      prev_hist[self.sys.nu:],
-      action
-    ]) if self.action_history_length > 1 else action
 
     # Scale actions from [-1, 1] to thrust commands in [0, max_thrust].
     max_thrusts = state.metrics['max_thrusts']
@@ -498,20 +498,25 @@ class QuadEnv(PipelineEnv):
 
 
 
-    prev_linvel = state.metrics.get('prev_linvel', jp.zeros(3))
     obs = self._get_obs(
       pipeline_state,
-      new_hist,
+      clipped_action,
       self.target_position,
-      noise_key,
-      prev_linvel
-    )
-    reward, _, _ = self.calc_reward(
-        obs, pipeline_state.time, collision, out_of_bounds, action,
-        angle_q1, prev_hist[-self.sys.nu:], self.target_position,
-        pipeline_state, max_thrusts
+      noise_key
     )
 
+    # roll the obs_history and append current obs
+    if self.history_length > 1:
+      new_hist = jp.concatenate([prev_hist[1:], obs[None, :]], axis=0)
+    else:
+      new_hist = obs[None, :]
+
+    reward, _, _ = self.calc_reward(
+        obs, pipeline_state.time, collision, out_of_bounds, action,
+        angle_q1, prev_hist[-1,-self.sys.nu:], self.target_position,
+        pipeline_state, max_thrusts
+    )
+    
     # dont terminate ground collision on ground start
     ground_collision = jp.logical_and(
       ground_collision,
@@ -534,23 +539,25 @@ class QuadEnv(PipelineEnv):
       'time': pipeline_state.time,
       'reward': reward,
       'max_thrusts': state.metrics['max_thrusts'],
-      'last_action_history': new_hist,
+      'obs_history': new_hist,
       'last_thrust': motor_thrusts_N,
       'tau_up':  state.metrics['tau_up'],
       'tau_down': state.metrics['tau_down'],
       'noise_key': noise_key,        
-      'prev_linvel': pipeline_state.cvel[self.q1_body_id][3:6],
     }
     if self.debug:
       jax.debug.print("---------")
-    return state.replace(pipeline_state=pipeline_state, obs=obs, reward=reward, done=done, metrics=metrics)
+
+    stacked_obs = self.get_stacked_obs(
+      new_hist
+    )
+    return state.replace(pipeline_state=pipeline_state, obs=stacked_obs, reward=reward, done=done, metrics=metrics)
 
   def _get_obs(self,
                data: base.State,
                last_action_history: jp.ndarray,
                target_position: jp.ndarray,
-               noise_key,
-               prev_linvel: jp.ndarray = None
+               noise_key
               ) -> jp.ndarray:
     """Constructs the observation vector from simulation data."""
     # Payload state.
@@ -607,8 +614,8 @@ class QuadEnv(PipelineEnv):
     obs = jp.concatenate([
       # ----                  # Shape  Slice
         pos_error,            # (3,)   0:3
-        quad1_rot,            # (9,)   3:12
-        quad1_linvel,         # (3,)  12:15
+        # quad1_rot,            # (9,)   3:12
+        # quad1_linvel,         # (3,)  12:15
         quad1_angvel,         # (3,)  15:18
         quad1_linear_acc,     # (3,)  18:21
         last_action_history,  # (4 * action_history_length,)  21:...
@@ -616,30 +623,36 @@ class QuadEnv(PipelineEnv):
 
     if self.debug:
       jax.debug.print("lpos_error: {pos_error}", pos_error=pos_error)
-      jax.debug.print("quad1_rot: {quad1_rot}", quad1_rot=quad1_rot)
-      jax.debug.print("quad1_linvel: {quad1_linvel}", quad1_linvel=quad1_linvel)
+      # jax.debug.print("quad1_rot: {quad1_rot}", quad1_rot=quad1_rot)
+      # jax.debug.print("quad1_linvel: {quad1_linvel}", quad1_linvel=quad1_linvel)
       jax.debug.print("quad1_angvel: {quad1_angvel}", quad1_angvel=quad1_angvel)
       jax.debug.print("quad1_linear_acc: {quad1_linear_acc}", quad1_linear_acc=quad1_linear_acc)
-     # jax.debug.print("last_action_history: {last_action_history}", last_action_history=last_action_history)
+      jax.debug.print("last_action_history: {last_action_history}", last_action_history=last_action_history)
 
 
     # runtime check
-    assert obs.shape[0] == self.OBS_SIZE, f"obs length {obs.shape[0]} != expected {self.OBS_SIZE}"
+    assert obs.shape[0] == self.BASE_OBS_SIZE, f"obs length {obs.shape[0]} != expected {self.BASE_OBS_SIZE}"
 
     # Lookup for noise scale factors (each multiplied with self.obs_noise):
     noise_lookup = jp.concatenate([
         jp.ones(3) * 0.005,  # quad position
-        jp.ones(9) * 0.01,   # quad rotation
-        jp.ones(3) * 0.1,   # quad linear velocity
-        jp.ones(3) * 0.1,   # quad angular velocity
-        jp.ones(3) * 0.1,   # quad linear acceleration
-        jp.ones(self.sys.nu * self.action_history_length) * 0.0,  # action history
+        # jp.ones(9) * 0.01,   # quad rotation
+        # jp.ones(3) * 0.1,   # quad linear velocity
+        jp.ones(3) * 0.2,   # quad angular velocity
+        jp.ones(3) * 0.5,   # quad linear acceleration
+        jp.ones(self.sys.nu) * 0.01,  # action history
     ])
 
     if self.obs_noise != 0.0:
         noise = self.obs_noise * noise_lookup * jax.random.normal(noise_key, shape=obs.shape)
         obs = obs + noise
     return obs
+
+  def get_stacked_obs(self, obs_history: jp.ndarray) -> jp.ndarray:
+    """Flatten H×N_obs history into a single vector for the agent."""
+    obs_hist = obs_history.reshape(-1)
+    assert obs_hist.shape[0] == self.OBS_SIZE, f"obs history length {obs_hist.shape[0]} != expected {self.OBS_SIZE}"
+    return obs_hist
 
   def calc_reward(self, obs, sim_time, collision, out_of_bounds, action,
                   angle_q1, last_action, target_position, data,
@@ -649,14 +662,14 @@ class QuadEnv(PipelineEnv):
     and energy penalties.
     """
     # verify obs dims before any slicing
-    assert obs.shape[0] == self.OBS_SIZE, f"obs length {obs.shape[0]} != expected {self.OBS_SIZE}"
+    assert obs.shape[0] == self.BASE_OBS_SIZE, f"obs length {obs.shape[0]} != expected {self.BASE_OBS_SIZE}"
 
     # lambda for exponential reward
     er = lambda x, s=2: jp.exp(-s * jp.abs(x))
 
     # Team observations: payload error and linear velocity.
 
-    pos_error = obs[:3]
+    pos_error = target_position - data.xpos[self.q1_body_id]
 
 
     dis = jp.linalg.norm(pos_error)
@@ -668,7 +681,6 @@ class QuadEnv(PipelineEnv):
 
 
     # Safety and smoothness penalties.
-    quad1_obs = obs   
 
     collision_penalty = 1.0 * collision 
     out_of_bounds_penalty = 1.0 * out_of_bounds
@@ -686,7 +698,7 @@ class QuadEnv(PipelineEnv):
     # Reward for quad velocities.
     # The reward is higher for lower angular velocities.
     # The reward is higher for lower linear velocities. 
-    ang_vel_q1 = quad1_obs[15:18] 
+    ang_vel_q1 = data.cvel[self.q1_body_id][:3]
 
 
     # ang_vel_reward = er(jp.linalg.norm(ang_vel_q1))
@@ -699,7 +711,7 @@ class QuadEnv(PipelineEnv):
 
     yaw_reward = er(ang_vel_q1[2], 20) - 0.1 * jp.abs(ang_vel_q1[2])
 
-    linvel_q1 = quad1_obs[12:15]
+    linvel_q1 = data.cvel[self.q1_body_id][3:6] # quad1 linear velocity
 
     linvel_quad_reward = (0.5 + 6 * er(dis, 30)) * (er(jp.linalg.norm(linvel_q1)))
 
@@ -744,10 +756,6 @@ class QuadEnv(PipelineEnv):
     # compute thrust to compensate for gravity and thrust from motor model
     thrust_reward = jp.mean(er(action_gravity - action))
 
-
-
-
-    
 
 
 
