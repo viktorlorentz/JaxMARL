@@ -187,7 +187,7 @@ class QuadEnv(PipelineEnv):
     
   
     # mask: if True use uniform sample, if False use normal sample close to target.
-    mask = jax.random.uniform(subkeys[9], (), minval=0.0, maxval=1.0) < 0.5 # 80% uniform, 20% normal
+    mask = jax.random.uniform(subkeys[9], (), minval=0.0, maxval=1.0) < 0.9 # 90% uniform, 10% normal
     normal_payload_pos = target_position + jax.random.normal(subkeys[10], (3,)) * 0.03
     
     # Choose payload position based on mask.
