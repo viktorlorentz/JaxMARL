@@ -260,7 +260,7 @@ class QuadEnv(PipelineEnv):
     rng, rng1, rng2, rng_config = jax.random.split(rng, 4)
 
     base_qpos = self.sys.qpos0  # Start with the reference configuration.
-    qvel = 0.1 * jax.random.normal(rng2, (self.sys.nv,))
+    qvel =  jax.random.normal(rng2, (self.sys.nv,))
     qvel = jp.clip(qvel, a_min=-5.0, a_max=5.0)
 
     # Get new positions for payload and both quadrotors.
@@ -468,7 +468,7 @@ class QuadEnv(PipelineEnv):
 
     collision = ground_collision_quad
 
-    out_of_bounds = jp.logical_and ( jp.absolute(angle_q1)  > jp.radians(90), pipeline_state.time > 0.5) # disable after 0.5s
+    #out_of_bounds = jp.logical_and ( jp.absolute(angle_q1)  > jp.radians(90), pipeline_state.time > 0.5) # disable after 0.5s
 
     
 
@@ -476,7 +476,8 @@ class QuadEnv(PipelineEnv):
 
     # out of bounds if spin too fast
     ang_vel = pipeline_state.cvel[self.q1_body_id][:3]
-    out_of_bounds = jp.logical_or(out_of_bounds, jp.linalg.norm(ang_vel) > 20)
+    out_of_bounds = jp.linalg.norm(ang_vel) > 20
+
 
     #out of bounds for pos error shrinking with time
     quad_error = self.target_position - quad1_pos
