@@ -585,25 +585,25 @@ class QuadEnv(PipelineEnv):
 
     # inject +-5deg roll/pitch/yaw noise into the rotation matrix
     noise_key, rot_key = jax.random.split(noise_key)
-    R_true = jp_R_from_quat(quad1_quat)
-    # sample noise angles ~ N(0, 5deg)
-    noise_angles = jax.random.normal(rot_key, (3,)) * (5 * jp.pi/180) * self.obs_noise
-    def euler_to_mat(roll, pitch, yaw):
-        cr, sr = jp.cos(roll), jp.sin(roll)
-        cp, sp = jp.cos(pitch), jp.sin(pitch)
-        cy, sy = jp.cos(yaw), jp.sin(yaw)
-        Rz = jp.array([[cy, -sy,  0],
-                       [sy,  cy,  0],
-                       [ 0,   0,  1]])
-        Ry = jp.array([[ cp, 0, sp],
-                       [  0, 1,  0],
-                       [-sp, 0, cp]])
-        Rx = jp.array([[1,   0,    0],
-                       [0,  cr, -sr],
-                       [0,  sr,  cr]])
-        return Rz @ Ry @ Rx
-    R_noise = euler_to_mat(*noise_angles)
-    quad1_rot = (R_true @ R_noise).ravel()
+    # R_true = jp_R_from_quat(quad1_quat)
+    # # sample noise angles ~ N(0, 5deg)
+    # noise_angles = jax.random.normal(rot_key, (3,)) * (5 * jp.pi/180) * self.obs_noise
+    # def euler_to_mat(roll, pitch, yaw):
+    #     cr, sr = jp.cos(roll), jp.sin(roll)
+    #     cp, sp = jp.cos(pitch), jp.sin(pitch)
+    #     cy, sy = jp.cos(yaw), jp.sin(yaw)
+    #     Rz = jp.array([[cy, -sy,  0],
+    #                    [sy,  cy,  0],
+    #                    [ 0,   0,  1]])
+    #     Ry = jp.array([[ cp, 0, sp],
+    #                    [  0, 1,  0],
+    #                    [-sp, 0, cp]])
+    #     Rx = jp.array([[1,   0,    0],
+    #                    [0,  cr, -sr],
+    #                    [0,  sr,  cr]])
+    #     return Rz @ Ry @ Rx
+    # R_noise = euler_to_mat(*noise_angles)
+    # quad1_rot = (R_true @ R_noise).ravel()
 
     # use Mujoco gyro & accelerometer, then remove gravity in local frame
     sensor_data = data.sensordata             # [gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z]
@@ -645,7 +645,7 @@ class QuadEnv(PipelineEnv):
     ])
 
     if self.obs_noise != 0.0:
-        noise = self.obs_noise * noise_lookup * jax.random.normal(noise_key, shape=obs.shape)
+        noise = self.obs_noise * noise_lookup * jax.random.normal(noise_key, shape=obs.shape) * jp.clip(0.1 * data.time - 3.0, 0.0, 1.0)
         obs = obs + noise
     return obs
 
