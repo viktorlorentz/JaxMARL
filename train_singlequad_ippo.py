@@ -132,11 +132,11 @@ def main():
             "max_thrust_range": 0.2,
             "episode_length": 8192,
             "policy_freq": 500,
-            "tau_up": 0.05,   # T = 150ms => approx: tau =4T 
-            "tau_down":0.05,    #
-            "sim_steps_per_action" : 1,
-            "disturbance_chance": 1/(500*5),  # one every  5 seconds    
-            "history_length": 3, 
+            "tau_up": 0.05,   # T = 150ms => approx: tau =4T
+            "tau_down": 0.05,    #
+            "sim_steps_per_action": 1,
+            "disturbance_chance": 1/(500*5),  # one every  5 seconds
+            "history_length": 6,
         },
         # "TOTAL_TIMESTEPS": 10_000_000_000,
         # "NUM_ENVS": 16384,
