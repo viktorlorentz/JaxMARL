@@ -107,7 +107,7 @@ def eval_results(eval_env, jit_reset, jit_inference_fn, jit_step):
 def main():
     # Default reward coefficients
     default_reward_coeffs = {
-        "distance_reward_coef": 1.0,
+        "distance_reward_coef": 10.0,
         "z_distance_reward_coef": 0.0,
         "velocity_reward_coef": 1.0,
         "safe_distance_coef": 0.0,
