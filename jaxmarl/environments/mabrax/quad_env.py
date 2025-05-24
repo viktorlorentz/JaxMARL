@@ -666,7 +666,7 @@ class QuadEnv(PipelineEnv):
     assert obs.shape[0] == self.BASE_OBS_SIZE, f"obs length {obs.shape[0]} != expected {self.BASE_OBS_SIZE}"
 
     # lambda for exponential reward
-    er = lambda x, s=2: jp.exp(-s * jp.abs(x))
+    er = lambda x, s=2: jp.exp(-s * jp.abs(x)) - jp.abs(0.01 * x)
 
     # Team observations: payload error and linear velocity.
 
@@ -687,7 +687,7 @@ class QuadEnv(PipelineEnv):
     out_of_bounds_penalty = 1.0 * out_of_bounds
 
     # Reward for quad orientations (encouraging them to remain upright).
-    up_reward = er(angle_q1) 
+    up_reward = er(angle_q1, 30) 
 
     # # taut string reward
     # quad1_dist = jp.linalg.norm(quad1_obs[:3]) # payload to quad1
