@@ -658,7 +658,7 @@ class QuadEnv(PipelineEnv):
     ])
 
     if self.obs_noise != 0.0:
-        noise = self.obs_noise * noise_lookup * jax.random.normal(noise_key, shape=obs.shape) * jp.clip(0.1 * data.time - 3.0, 0.0, 1.0)
+        noise = self.obs_noise * noise_lookup * jax.random.normal(noise_key, shape=obs.shape)
         obs = obs + noise
     return obs
 
