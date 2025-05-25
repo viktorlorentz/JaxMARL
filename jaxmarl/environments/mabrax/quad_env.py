@@ -139,7 +139,7 @@ class QuadEnv(PipelineEnv):
     self.q1_qpos_start = sys.mj_model.jnt_qposadr[self.q1_joint_id]
 
 
-    self.BASE_OBS_SIZE = 3 + 3 + 3 + 3 + 4   
+    self.BASE_OBS_SIZE = 3 + 9 + 3 + 3 + 3 + 4   
     self.OBS_SIZE = self.BASE_OBS_SIZE * self.history_length
 
     print("Observation size:", self.BASE_OBS_SIZE)
@@ -596,25 +596,25 @@ class QuadEnv(PipelineEnv):
 
     # inject +-5deg roll/pitch/yaw noise into the rotation matrix
     noise_key, rot_key = jax.random.split(noise_key)
-    # R_true = jp_R_from_quat(quad1_quat)
-    # # sample noise angles ~ N(0, 5deg)
-    # noise_angles = jax.random.normal(rot_key, (3,)) * (5 * jp.pi/180) * self.obs_noise
-    # def euler_to_mat(roll, pitch, yaw):
-    #     cr, sr = jp.cos(roll), jp.sin(roll)
-    #     cp, sp = jp.cos(pitch), jp.sin(pitch)
-    #     cy, sy = jp.cos(yaw), jp.sin(yaw)
-    #     Rz = jp.array([[cy, -sy,  0],
-    #                    [sy,  cy,  0],
-    #                    [ 0,   0,  1]])
-    #     Ry = jp.array([[ cp, 0, sp],
-    #                    [  0, 1,  0],
-    #                    [-sp, 0, cp]])
-    #     Rx = jp.array([[1,   0,    0],
-    #                    [0,  cr, -sr],
-    #                    [0,  sr,  cr]])
-    #     return Rz @ Ry @ Rx
-    # R_noise = euler_to_mat(*noise_angles)
-    # quad1_rot = (R_true @ R_noise).ravel()
+    R_true = jp_R_from_quat(quad1_quat)
+    # sample noise angles ~ N(0, 5deg)
+    noise_angles = jax.random.normal(rot_key, (3,)) * (5 * jp.pi/180) * self.obs_noise
+    def euler_to_mat(roll, pitch, yaw):
+        cr, sr = jp.cos(roll), jp.sin(roll)
+        cp, sp = jp.cos(pitch), jp.sin(pitch)
+        cy, sy = jp.cos(yaw), jp.sin(yaw)
+        Rz = jp.array([[cy, -sy,  0],
+                       [sy,  cy,  0],
+                       [ 0,   0,  1]])
+        Ry = jp.array([[ cp, 0, sp],
+                       [  0, 1,  0],
+                       [-sp, 0, cp]])
+        Rx = jp.array([[1,   0,    0],
+                       [0,  cr, -sr],
+                       [0,  sr,  cr]])
+        return Rz @ Ry @ Rx
+    R_noise = euler_to_mat(*noise_angles)
+    quad1_rot = (R_true @ R_noise).ravel()
 
     # use Mujoco gyro & accelerometer, then remove gravity in local frame
     sensor_data = data.sensordata             # [gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z]
@@ -626,7 +626,7 @@ class QuadEnv(PipelineEnv):
     obs = jp.concatenate([
       # ----                  # Shape  Slice
         pos_error,            # (3,)   0:3
-        # quad1_rot,            # (9,)   3:12
+        quad1_rot,            # (9,)   3:12
         quad1_linvel,         # (3,)  12:15
         quad1_angvel,         # (3,)  15:18
         quad1_linear_acc,     # (3,)  18:21
