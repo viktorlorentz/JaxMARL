@@ -109,17 +109,17 @@ def main():
     default_reward_coeffs = {
         "distance_reward_coef": 1.0,
         "z_distance_reward_coef": 0.0,
-        "velocity_reward_coef": 1.0,
+        "velocity_reward_coef": 10.0,
         "safe_distance_coef": 0.0,
-        "up_reward_coef": 1.0,
+        "up_reward_coef": 10.0,
         "linvel_reward_coef": 0.0,
         "ang_vel_reward_coef": 1.0,
-        "linvel_quad_reward_coef": 1.0,
+        "linvel_quad_reward_coef": 0.0,
         "taut_reward_coef": 0.0,
         "collision_penalty_coef": -10.0,
         "out_of_bounds_penalty_coef": -10.0,
-        "smooth_action_coef": -1.0,
-        "action_energy_coef": -0.1,
+        "smooth_action_coef": -10.0,
+        "action_energy_coef": -1.0,
         "yaw_reward_coef": 0.0,
     }
     # Build configuration for IPPO training on multiquad_2x4
@@ -136,7 +136,7 @@ def main():
             "tau_down": 0.05,    #
             "sim_steps_per_action": 1,
             "disturbance_chance": 1/(500*5),  # one every  5 seconds
-            "history_length": 3,
+            "history_length": 10,
         },
         # "TOTAL_TIMESTEPS": 10_000_000_000,
         # "NUM_ENVS": 16384,
