@@ -649,7 +649,7 @@ class QuadEnv(PipelineEnv):
     # Lookup for noise scale factors (each multiplied with self.obs_noise):
     noise_lookup = jp.concatenate([
         jp.ones(3) * 0.002,  # quad position
-        # jp.ones(9) * 0.01,   # quad rotation
+        jp.ones(9) * 0.01,   # quad rotation
         jp.ones(3) * 0.2,   # quad linear velocity
         jp.ones(3) * 0.2,   # quad angular velocity
         jp.ones(3) * 0.5,   # quad linear acceleration
