@@ -590,7 +590,7 @@ class QuadEnv(PipelineEnv):
       w, x, y, z = q
       cos_psi = 1.0 - 2.0*(y*y + z*z)
       sin_psi = 2.0*(w*z + x*y)
-      return [cos_psi, sin_psi]
+      return jp.array([cos_psi, sin_psi])
   
     yaw_vec = yaw_unit_vector_from_quat(quad1_quat)
 
