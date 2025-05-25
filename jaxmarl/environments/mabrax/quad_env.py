@@ -753,9 +753,12 @@ class QuadEnv(PipelineEnv):
     smooth_action_penalty /= self.time_per_action * 1000  # normlize for frequency
 
 
-    thrusts = (action * max_thrust)/jp.mean(max_thrust)
-    thrusts_variance = jp.mean((thrusts - jp.mean(thrusts))**2)
-    smooth_action_penalty += thrusts_variance # penalize variance in thrusts
+    thrusts = ((0.5 * (action + 1)) * max_thrust)/jp.mean(max_thrust)
+
+     # optimal thrust for 33g quad
+    optimal_thrust = 0.033 * 9.81
+    
+    smooth_action_penalty += er(jp.sum(thrusts) - optimal_thrust)
 
 
     action_energy_penalty = jp.mean((0.5 * (action + 1))**2)
@@ -775,6 +778,8 @@ class QuadEnv(PipelineEnv):
     action_gravity = jp.clip(thrust_gravity_per_motor / max_thrust, 0.0, 1.0)
     # compute thrust to compensate for gravity and thrust from motor model
     thrust_reward = jp.mean(er(action_gravity - action))
+
+   
 
 
 
