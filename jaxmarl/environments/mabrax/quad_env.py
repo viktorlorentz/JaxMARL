@@ -139,7 +139,7 @@ class QuadEnv(PipelineEnv):
     self.q1_qpos_start = sys.mj_model.jnt_qposadr[self.q1_joint_id]
 
 
-    self.BASE_OBS_SIZE = 3 + 3 + 3 + 4   
+    self.BASE_OBS_SIZE = 3 + 3 + 3 + 3 + 4   
     self.OBS_SIZE = self.BASE_OBS_SIZE * self.history_length
 
     print("Observation size:", self.BASE_OBS_SIZE)
@@ -627,7 +627,7 @@ class QuadEnv(PipelineEnv):
       # ----                  # Shape  Slice
         pos_error,            # (3,)   0:3
         # quad1_rot,            # (9,)   3:12
-        #quad1_linvel,         # (3,)  12:15
+        quad1_linvel,         # (3,)  12:15
         quad1_angvel,         # (3,)  15:18
         quad1_linear_acc,     # (3,)  18:21
         #yaw_vec,              # (2,)  21:23
@@ -652,7 +652,7 @@ class QuadEnv(PipelineEnv):
         # jp.ones(9) * 0.01,   # quad rotation
         jp.ones(3) * 0.2,   # quad linear velocity
         jp.ones(3) * 0.2,   # quad angular velocity
-        #jp.ones(3) * 0.5,   # quad linear acceleration
+        jp.ones(3) * 0.5,   # quad linear acceleration
         #jp.ones(2) * 0.1,  # quad yaw vector
         jp.ones(self.sys.nu) * 0.01,  # action history
     ])
