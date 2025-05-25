@@ -752,6 +752,12 @@ class QuadEnv(PipelineEnv):
     smooth_action_penalty = jp.mean(jp.abs(action - last_action))
     smooth_action_penalty /= self.time_per_action * 1000  # normlize for frequency
 
+
+    thrusts = (action * max_thrust)/jp.mean(max_thrust)
+    thrusts_variance = jp.mean((thrusts - jp.mean(thrusts))**2)
+    smooth_action_penalty += thrusts_variance # penalize variance in thrusts
+
+
     action_energy_penalty = jp.mean((0.5 * (action + 1))**2)
 
 
