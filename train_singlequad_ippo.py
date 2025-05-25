@@ -118,7 +118,7 @@ def main():
         "taut_reward_coef": 0.0,
         "collision_penalty_coef": -10.0,
         "out_of_bounds_penalty_coef": -10.0,
-        "smooth_action_coef": -1.0,
+        "smooth_action_coef": -10.0,
         "action_energy_coef": 0.0,
         "yaw_reward_coef": 0.0,
     }
@@ -142,7 +142,7 @@ def main():
         # "NUM_ENVS": 16384,
         # "NUM_STEPS": 128,
         # "NUM_MINIBATCHES": 512,
-        "TOTAL_TIMESTEPS": 1_000_000_000,
+        "TOTAL_TIMESTEPS": 2_000_000_000,
         "NUM_ENVS": 4096, # 16384,
         "NUM_STEPS": 512,
         "NUM_MINIBATCHES": 256, #512,
