@@ -17,74 +17,45 @@ from jaxmarl.wrappers.baselines import LogWrapper
 import matplotlib.pyplot as plt
 import hydra
 from omegaconf import OmegaConf
-import time
-import sys
-import jaxmarl.environments.mabrax.mabrax_env
-
-from jax2onnx import to_onnx, onnx_function
-
-class EarlyTermination(Exception): 
-    pass
-
-class ActorModule(nn.Module):
-    action_dim: int
-    activation: str = "tanh"
-    actor_arch: Sequence[int] = None
-
-
-    @nn.compact
-    def __call__(self, x):
-        act_fn = nn.relu if self.activation == "relu" else nn.tanh
-        a = x
-        for h in self.actor_arch or [128, 64, 64]:
-            a = nn.Dense(h, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(a)
-            a = act_fn(a)
-        actor_mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(a)
-        return actor_mean
-
-class CriticModule(nn.Module):
-    activation: str = "tanh"
-    critic_arch: Sequence[int] = None
-
-
-    @nn.compact
-    def __call__(self, x):
-        act_fn = nn.relu if self.activation == "relu" else nn.tanh
-        c = x
-        for h in self.critic_arch or [128, 128, 128, 128]:
-            c = nn.Dense(h, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(c)
-            c = act_fn(c)
-        c = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(c)
-        return jnp.squeeze(c, axis=-1)
 
 class ActorCritic(nn.Module):
-    action_dim: int
+    action_dim: Sequence[int]
     activation: str = "tanh"
-    actor_arch: Sequence[int] = None
-    critic_arch: Sequence[int] = None
 
-    def setup(self):
-        self.actor_module = ActorModule(action_dim=self.action_dim,
-                                        activation=self.activation,
-                                        actor_arch=self.actor_arch)
-        self.critic_module = CriticModule(activation=self.activation,
-                                          critic_arch=self.critic_arch)
-        self.log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
-
+    @nn.compact
     def __call__(self, x):
-        actor_mean = self.actor_module(x)
-        pi = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(self.log_std))
-        critic = self.critic_module(x)
-        return pi, critic
-   
-    def actor_forward(self, x):
-        # Returns actor output only
-        return self.actor_module(x)
-   
-    def critic_forward(self, x):
-        # Returns critic value only
-        return self.critic_module(x)
+        if self.activation == "relu":
+            activation = nn.relu
+        else:
+            activation = nn.tanh
+        actor_mean = nn.Dense(
+            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(x)
+        actor_mean = activation(actor_mean)
+        actor_mean = nn.Dense(
+            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(actor_mean)
+        actor_mean = activation(actor_mean)
+        actor_mean = nn.Dense(
+            self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
+        )(actor_mean)
+        actor_logtstd = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
+        pi = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_logtstd))
 
+        critic = nn.Dense(
+            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(x)
+        critic = activation(critic)
+        critic = nn.Dense(
+            64, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
+        )(critic)
+        critic = activation(critic)
+        critic = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))(
+            critic
+        )
+
+        return pi, jnp.squeeze(critic, axis=-1)
+    
 class Transition(NamedTuple):
     done: jnp.ndarray
     action: jnp.ndarray
@@ -123,15 +94,8 @@ def make_train(config, rng_init):
         frac = 1.0 - (count // (config["NUM_MINIBATCHES"] * config["UPDATE_EPOCHS"])) / config["NUM_UPDATES"]
         return config["LR"] * frac
 
-    # INIT NETWORK 
-    network = ActorCritic(
-        action_dim=env.action_space(env.agents[0]).shape[0],
-        activation=config["ACTIVATION"],
-        actor_arch=config.get("ACTOR_ARCH", [128, 64, 64]),
-        critic_arch=config.get("CRITIC_ARCH", [128, 128, 128])
-    )
-    print('Network initialized with architectures:', network.actor_arch, network.critic_arch)
-
+    # INIT NETWORK
+    network = ActorCritic(env.action_space(env.agents[0]).shape[0], activation=config["ACTIVATION"])
     max_dim = jnp.argmax(jnp.array([env.observation_space(a).shape[-1] for a in env.agents]))
     init_x = jnp.zeros(env.observation_space(env.agents[max_dim]).shape)
     network_params = network.init(rng_init, init_x)
@@ -313,32 +277,10 @@ def make_train(config, rng_init):
                 return update_state, loss_info
 
             def callback(metric):
-                wandb.log(metric, step=metric["update_step"])
-                global last_interval_log_time
-                global last_termination_threshhold
-                current_time = time.time()
-                if current_time - last_interval_log_time >= 60:
-                    r_lengths = metric.get("returned_episode_lengths", None)
-                    if r_lengths is not None:
-                        # Check if r_lengths is 0-dimensional and extract its value accordingly.
-                        if hasattr(r_lengths, "ndim") and r_lengths.ndim == 0:
-                            interval_value = r_lengths.item()
-                        else:
-                            interval_value = r_lengths[-1]
-                        wandb.log({"episode_length_interval": interval_value, "termination_threshold": last_termination_threshhold}, step=metric["update_step"])
-                    
-                        # Trigger early termination via a custom exception
-                        # if interval_value < last_termination_threshhold:
-                        #     wandb.log({"early_termination": True}, step=metric["update_step"])
-                        #     print("Early termination triggered.")
-                        #     wandb.finish(exit_code=0)
-                        #     raise EarlyTermination("Terminating training.")
-                        # # Update the termination threshold for the next interval
-                        # delta = jnp.clip(interval_value - last_termination_threshhold, 10, 20)
-                        # last_termination_threshhold += delta * 0.2 * (1.1 - np.clip(interval_value/600,0,1))
-                    
-                    last_interval_log_time = current_time
-                    
+                wandb.log(
+                    metric,
+                    step=metric["update_step"],
+                )
 
             update_state = (train_state, traj_batch, advantages, targets, rng)
             update_state, loss_info = jax.lax.scan(
@@ -361,19 +303,12 @@ def make_train(config, rng_init):
 
         rng, _rng = jax.random.split(rng)
         runner_state = (train_state, env_state, obsv, 0, _rng)
-        try:
-            runner_state, metric = jax.lax.scan(
-                _update_step, runner_state, None, config["NUM_UPDATES"]
-            )
-        except EarlyTermination:
-            # Early termination: return current state instead of raising an error.
-            return {"runner_state": runner_state, "metrics": {}}
+        runner_state, metric = jax.lax.scan(
+            _update_step, runner_state, None, config["NUM_UPDATES"]
+        )
         return {"runner_state": runner_state, "metrics": metric}
 
     return train
-
-last_interval_log_time = 0
-last_termination_threshhold = 0
 
 @hydra.main(version_base=None, config_path="config", config_name="ippo_ff_mabrax")
 def main(config):

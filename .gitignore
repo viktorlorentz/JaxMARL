@@ -3,7 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
-*.ipynb
 *.DS_Store
 .vscode/
 .ipynb_checkpoints/
@@ -15,3 +14,13 @@ tmp/
 wandb/
 outputs/
 models/
+*.mp4
+*.tflite
+
+!jaxmarl/environments/mabrax/randomization.ipynb
+!jaxmarl/environments/mabrax/vel_reward.ipynb
+
+/*.png
+/*.asdf
+
+jit_*

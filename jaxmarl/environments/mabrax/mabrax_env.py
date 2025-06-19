@@ -3,6 +3,8 @@ import chex
 from jaxmarl.environments.multi_agent_env import MultiAgentEnv
 from jaxmarl.environments import spaces
 from brax import envs
+import jaxmarl.environments.mabrax.multi_quad_env  
+import jaxmarl.environments.mabrax.quad_env
 import jax
 import jax.numpy as jnp
 from functools import partial
@@ -106,7 +108,7 @@ class MABraxEnv(MultiAgentEnv):
         Dict[str, chex.Array], envs.State, Dict[str, float], Dict[str, bool], Dict
     ]:
         global_action = self.map_agents_to_global_action(actions)
-        next_state = self.env.step(state, global_action)  # type: ignore
+        next_state = self.env.step(state, global_action)
         observations = self.get_obs(next_state)
         rewards = {agent: next_state.reward for agent in self.agents}
         rewards["__all__"] = next_state.reward
@@ -130,6 +132,20 @@ class MABraxEnv(MultiAgentEnv):
             A dictionary of observations for each agent.
         """
         return self.map_global_obs_to_agents(state.obs)
+
+    def render(self, state, **kwargs):
+        # Ensure each state in the trajectory has the attributes required for rendering.
+        def convert(s):
+            # If s already has attribute 'q', return as-is.
+            if hasattr(s, "q"):
+                return s
+            # If s has a pipeline_state with attribute 'q', use that.
+            if hasattr(s, "pipeline_state") and hasattr(s.pipeline_state, "q"):
+                return s.pipeline_state
+            return s
+        traj = state if isinstance(state, (list, tuple)) else [state]
+        traj = [convert(s) for s in traj]
+        return self.env.render(traj, **kwargs)
 
     def map_agents_to_global_action(
         self, agent_actions: Dict[str, jnp.ndarray]
@@ -191,11 +207,17 @@ class MABraxEnv(MultiAgentEnv):
             else:
                 # Just agent's own observations
                 agent_obs[agent_name] = global_obs[obs_indices]
+
+            agent_obs["global"] = global_obs
         return agent_obs
 
     @property
     def sys(self):
         return self.env.sys
+
+    @property
+    def dt(self):
+        return self.env.dt
 
 
 class Ant(MABraxEnv):
@@ -221,3 +243,11 @@ class Humanoid(MABraxEnv):
 class Walker2d(MABraxEnv):
     def __init__(self, **kwargs):
         super().__init__("walker2d_2x3", **kwargs)
+
+class MultiQuad(MABraxEnv):
+    def __init__(self,  **kwargs):
+        super().__init__("multiquad_ix4", **kwargs)
+
+class Quad(MABraxEnv):
+    def __init__(self, **kwargs):
+        super().__init__("quad_1x4", **kwargs)
