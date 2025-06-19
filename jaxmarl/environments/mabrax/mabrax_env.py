@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from .mappings import _agent_action_mapping, _agent_observation_mapping
+from .mappings import _agent_action_mapping, _agent_observation_mapping, get_ix4_mappings
 
 # TODO: move homogenisation to a separate wrapper
 
@@ -53,8 +53,19 @@ class MABraxEnv(MultiAgentEnv):
         self.action_repeat = action_repeat
         self.auto_reset = auto_reset
         self.homogenisation_method = homogenisation_method
-        self.agent_obs_mapping = _agent_observation_mapping[env_name]
-        self.agent_action_mapping = _agent_action_mapping[env_name]
+
+        # dynamic mapping for multiquad_ix4 based on env.num_quads
+        if env_name == "multiquad_ix4":
+            num_quads = getattr(self.env, 'num_quads', None)
+            if num_quads is None:
+                raise ValueError("Environment missing 'num_quads' for dynamic ix4 mappings")
+            action_map, obs_map = get_ix4_mappings(num_quads)
+            self.agent_obs_mapping = obs_map
+            self.agent_action_mapping = action_map
+        else:
+            self.agent_obs_mapping = _agent_observation_mapping[env_name]
+            self.agent_action_mapping = _agent_action_mapping[env_name]
+
         self.agents = list(self.agent_obs_mapping.keys())
 
         self.num_agents = len(self.agent_obs_mapping)

@@ -31,10 +31,15 @@ def unbatchify(x: jnp.ndarray, agent_list, num_envs, num_actors):
 
 #------------------------------------------------------------------------------
 # Rendering utility
-def render_video(pipeline_states, env, render_every=10, width=640, height=480, output="rollout_video.mp4"):
+def render_video(pipeline_states, env, render_every=10, width=1920, height=1080, output="rollout_video.mp4"):
     ctx = mujoco.GLContext(width, height)
     ctx.make_current()
     print("Rendering rollout...")
+    # Save first frame as PNG
+    first_frame = env.render(pipeline_states[:1], camera="track", width=width, height=height)[0]
+    png_name = os.path.splitext(output)[0] + "_first_frame.png"
+    imageio.imwrite(png_name, first_frame)
+    print(f"First frame saved to {png_name}")
     frames = env.render(pipeline_states[::render_every], camera="track", width=width, height=height)
     fps = float(1.0 / (env.dt * render_every))
     imageio.mimsave(output, frames, fps=fps)
@@ -55,7 +60,7 @@ def parse_args():
         description="Run a multiquad rollout with a TFLite actor, save to ASDF, and render video"
     )
     p.add_argument("--model_path", type=str, default="actor_model.tflite", help="Path to TFLite actor model")
-    p.add_argument("--num_envs", type=int, default=1000, help="Number of parallel environments")
+    p.add_argument("--num_envs", type=int, default=100, help="Number of parallel environments")
     p.add_argument("--timesteps", type=int, default=4000, help="Number of simulation steps")
     p.add_argument("--output", type=str, default="flights.crazy.asdf", help="ASDF output filename")
     p.add_argument("--video", type=str, default="rollout_video.mp4", help="Rendered video filename")
@@ -206,7 +211,15 @@ def main():
     x, y = figure_eight(args.timesteps, width=1.0, height=1.0, rounds=1)
     traj = np.stack([x, y, 1.5 * np.ones_like(x)], axis=-1)
 
-    env = jaxmarl.make("multiquad_ix4",  episode_length=args.timesteps, trajectory=traj)
+    env_config = {
+        "episode_length": args.timesteps,
+        "trajectory": traj,
+        "num_quads": 2,  # assuming 4 quadrotors
+        "trajectory": traj,  # use the figure-eight trajectory
+    }
+    print(f"Creating environment with config: {env_config}")
+
+    env = jaxmarl.make("multiquad_ix4", **env_config)
 
     # Batched rollout: collect and save data
     obs_h, act_h, rew_h, done_h, agents = run_batched_rollout(interpreter, env, args.num_envs, args.timesteps)
@@ -215,7 +228,10 @@ def main():
     # Single-env rollout for rendering
     print("Running single-env rollout for rendering...")
     states = run_single_rollout(interpreter, env, args.timesteps)
-    render_video(states, env, render_every=10, width=640, height=480, output=args.video)
+    render_video(states, env, render_every=10, width=1920, height=1080, output=args.video)
 
 if __name__ == "__main__":
     main()
+
+
+

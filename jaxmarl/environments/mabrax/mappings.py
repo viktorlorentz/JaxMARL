@@ -183,41 +183,57 @@ ranges: Dict[str, Dict[str, List[Union[int, Tuple[int, int]]]]] = {
     },
 }
 
-# dynamic mapping for ix4 observations
-_NUM_QUADS    = 5       # number of quadrotors in the environment  
-_OBS_OFF      = 6       # payload_error (0–2) + payload_linvel (3–5)
-_STATE_BLOCK  = 24      # per-quad features total
-_NU_PER_AGENT = 4       # last_action per agent
+# dynamic mapping for ix4 observations (removed)
+# --- ADD DYNAMIC ACTION MAPPING FOR ix4 (removed)
 
-_dyn_ix4: Dict[str, List[Union[int, Tuple[int, int]]]] = {}
-_last_start = _OBS_OFF + _NUM_QUADS * _STATE_BLOCK
+# Add function to generate ix4 mappings dynamically
 
-for i in range(_NUM_QUADS):
-    idxs: List[Union[int, Tuple[int, int]]] = [
-        (0, 2),   # payload_error
-        (3, 5),   # payload_linvel
-    ]
-    # other agents' rel-pos slices
-    for j in range(_NUM_QUADS):
-        if j != i:
-            off = _OBS_OFF + j * _STATE_BLOCK
-            idxs.append((off, off + 2))
-    # own full state block
-    base = _OBS_OFF + i * _STATE_BLOCK
-    idxs.append((base, base + _STATE_BLOCK - 1))
-    # own last_action slice
-    idxs.append((_last_start + i * _NU_PER_AGENT,
-                 _last_start + (i + 1) * _NU_PER_AGENT - 1))
-    _dyn_ix4[f"agent_{i}"] = idxs
-print(f"Dynamic ix4 mapping: {_dyn_ix4}")
-ranges["multiquad_ix4"] = _dyn_ix4
+_OBS_OFF = 6       # payload_error (0–2) + payload_linvel (3–5)
+_STATE_BLOCK = 24  # per-quad features total
+_NU_PER_AGENT = 4  # last_action per agent
 
-# --- ADD DYNAMIC ACTION MAPPING FOR ix4 ---
-_agent_action_mapping["multiquad_ix4"] = {
-    f"agent_{i}": jnp.arange(i * _NU_PER_AGENT, (i + 1) * _NU_PER_AGENT)
-    for i in range(_NUM_QUADS)
-}
+def get_ix4_mappings(num_quads: int):
+    """
+    Generate dynamic observation and action mappings for multiquad_ix4 environments.
 
+    Args:
+        num_quads: Number of quadrotors in the environment.
+
+    Returns:
+        Tuple of (action_mapping, observation_mapping) where
+        - action_mapping maps agent names to JAX arrays of action indices,
+        - observation_mapping maps agent names to JAX arrays of observation indices.
+    """
+    # build dynamic observation ranges
+    dyn_ix = {}
+    last_start = _OBS_OFF + num_quads * _STATE_BLOCK
+    for i in range(num_quads):
+        idxs = [
+            (0, 2),   # payload_error
+            (3, 5),   # payload_linvel
+        ]
+        # other agents' rel-pos slices
+        for j in range(num_quads):
+            if j != i:
+                off = _OBS_OFF + j * _STATE_BLOCK
+                idxs.append((off, off + 2))
+        # own full state block
+        base = _OBS_OFF + i * _STATE_BLOCK
+        idxs.append((base, base + _STATE_BLOCK - 1))
+        # own last_action slice
+        idxs.append((last_start + i * _NU_PER_AGENT,
+                     last_start + (i + 1) * _NU_PER_AGENT - 1))
+        dyn_ix[f"agent_{i}"] = idxs
+    # build action mapping
+    action_map = {
+        f"agent_{i}": jnp.arange(i * _NU_PER_AGENT, (i + 1) * _NU_PER_AGENT)
+        for i in range(num_quads)
+    }
+    # build observation mapping
+    obs_map = {agent: jnp.array(listerize(ranges)) for agent, ranges in dyn_ix.items()}
+    return action_map, obs_map
+
+# build static agent observation mapping
 _agent_observation_mapping = {
     k: {k_: jnp.array(listerize(v_)) for k_, v_ in v.items()} for k, v in ranges.items()
 }
